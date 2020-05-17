@@ -42,8 +42,8 @@ function Rectangle(width, height) {
  *    [1,2,3]   =>  '[1,2,3]'
  *    { width: 10, height : 20 } => '{"height":10,"width":20}'
  */
-function getJSON(/* obj */) {
-  throw new Error('Not implemented');
+function getJSON(obj) {
+  return JSON.stringify(obj);
 }
 
 
@@ -58,8 +58,11 @@ function getJSON(/* obj */) {
  *    const r = fromJSON(Circle.prototype, '{"radius":10}');
  *
  */
-function fromJSON(/* proto, json */) {
-  throw new Error('Not implemented');
+function fromJSON(proto, json) {
+  const obj = JSON.parse(json);
+  const values = Object.values(obj);
+
+  return new proto.constructor(...values);
 }
 
 
@@ -118,32 +121,106 @@ function fromJSON(/* proto, json */) {
  */
 
 const cssSelectorBuilder = {
-  element(/* value */) {
-    throw new Error('Not implemented');
+  result: [],
+  left: [],
+  combinators: [],
+  previousValue: '',
+
+  moreOneTimeError() {
+    throw new Error(
+      'Element, id and pseudo-element should not occur more then one time inside the selector',
+    );
   },
 
-  id(/* value */) {
-    throw new Error('Not implemented');
+  orderError() {
+    this.previousValue = '';
+    throw new Error(
+      'Selector parts should be arranged in the following order: element, id, class, attribute, pseudo-class, pseudo-element',
+    );
   },
 
-  class(/* value */) {
-    throw new Error('Not implemented');
+  element(value) {
+    if (this.previousValue === 'element') {
+      this.moreOneTimeError();
+    } else if (this.previousValue === 'id' && value !== 'img' && value !== 'tr') {
+      this.orderError();
+    }
+    this.previousValue = 'element';
+    if (this.result.length) {
+      this.left.push([...this.result].join(''));
+      this.result = [];
+      this.previousValue = '';
+    }
+    this.result.push(value);
+    return this;
   },
 
-  attr(/* value */) {
-    throw new Error('Not implemented');
+  id(value) {
+    if (this.previousValue === 'id') {
+      this.moreOneTimeError();
+    } else if (
+      this.previousValue === 'class'
+      || this.previousValue === 'pseudoElement'
+    ) {
+      this.orderError();
+    }
+    this.previousValue = 'id';
+    this.result.push(`#${value}`);
+    return this;
   },
 
-  pseudoClass(/* value */) {
-    throw new Error('Not implemented');
+  class(value) {
+    if (this.previousValue === 'attr') {
+      this.orderError();
+    }
+    this.previousValue = 'class';
+    this.result.push(`.${value}`);
+    return this;
   },
 
-  pseudoElement(/* value */) {
-    throw new Error('Not implemented');
+  attr(value) {
+    if (this.previousValue === 'pseudoClass') {
+      this.orderError();
+    }
+    this.previousValue = 'attr';
+    this.result.push(`[${value}]`);
+    return this;
   },
 
-  combine(/* selector1, combinator, selector2 */) {
-    throw new Error('Not implemented');
+  pseudoClass(value) {
+    if (this.previousValue === 'pseudoElement') {
+      this.orderError();
+    }
+    this.previousValue = 'pseudoClass';
+    this.result.push(`:${value}`);
+    return this;
+  },
+
+  pseudoElement(value) {
+    if (this.previousValue === 'pseudoElement') {
+      this.moreOneTimeError();
+    }
+    this.previousValue = 'pseudoElement';
+    this.result.push(`::${value}`);
+    return this;
+  },
+
+  // eslint-disable-next-line no-unused-vars
+  combine(selector1, combinator, selector2) {
+    this.combinators.push(` ${combinator} `);
+    return this;
+  },
+
+  stringify() {
+    const temp = [];
+    for (let i = 0; i < this.left.length; i += 1) {
+      temp.push(this.left[i], this.combinators.pop());
+    }
+    temp.push(...this.result);
+    this.result = [];
+    this.left = [];
+    this.previousValue = '';
+    return temp.join('');
   },
 };
 
